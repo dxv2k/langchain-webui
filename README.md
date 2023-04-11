@@ -1,5 +1,11 @@
 # LangChain-Gradio Template
 
+
+## To run: 
+```
+gradio appp.py 
+```
+
 This repo serves as a template for how to deploy a LangChain on Gradio.
 This is particularly useful because you can easily deploy Gradio apps on Hugging Face spaces, 
 making it very easy to share you LangChain applications on there.
