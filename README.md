@@ -1,7 +1,12 @@
 # LangChain-Gradio Template
 
 
-## To run: 
+## To run:
+```
+python app.py
+```
+
+Reload: 
 ```
 gradio appp.py 
 ```
@@ -21,3 +26,18 @@ Depending on the type of your chain, you may also need to change the inputs/outp
 To deploy to Hugging Face spaces, you should first create a new Gradio space on Hugging Face.
 From there, you can then copy over the `app.py` file here, and the `requirements.txt`.
 Do not copy over this ReadMe - Hugging Face spaces requires a ReadMe in a particular format.
+
+
+
+# Commit Convention: 
+* API relevant changes
+    * `feat` Commits, that adds a new feature
+    * `fix` Commits, that fixes a bug
+* `refactor` Commits, that rewrite/restructure your code, however does not change any behaviour
+    * `perf` Commits are special `refactor` commits, that improve performance
+* `style` Commits, that do not affect the meaning (white-space, formatting, missing semi-colons, etc)
+* `test` Commits, that add missing tests or correcting existing tests
+* `docs` Commits, that affect documentation only
+* `build` Commits, that affect build components like build tool, ci pipeline, dependencies, project version, ...
+* `ops` Commits, that affect operational components like infrastructure, deployment, backup, recovery, ...
+* `chore` Miscellaneous commits e.g. modifying `.gitignore`
