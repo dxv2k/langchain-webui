@@ -3,18 +3,46 @@ import shutil
 from typing import Optional, Tuple
 
 import gradio as gr
-from langchain.chains import ConversationChain
-from langchain.llms import OpenAI
 from threading import Lock
 
 
+from langchain.chains import ConversationChain
+from langchain.llms import OpenAI
+from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.document_loaders import UnstructuredFileLoader
+from langchain.indexes import VectorstoreIndexCreator
+
+os.environ["OPENAI_API_KEY"] = "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"  
 SAVE_DIR = "./uploads/"
 
-def load_chain():
+def load_simple_chat_chain() -> ConversationChain:
     """Logic for loading the chain you want to use should go here."""
-    llm = OpenAI(temperature=0)
-    chain = ConversationChain(llm=llm)
+    chat_llm = ChatOpenAI(
+        temperature=0, 
+        model_name = "gpt-3.5-turbo"
+    ) 
+    chain = ConversationChain(llm=chat_llm)
     return chain
+
+def extract_embedding_from_docs(docname: str, chunk_size: int = 1000, chunk_overlap: int = 0) -> OpenAIEmbeddings:  
+    # NOTE: pseudo func     
+
+    def _get_file_from_docname(docname: str) -> str: 
+        pass 
+
+    embeddings = OpenAIEmbeddings(model_name="text-embedding-ada-002")
+
+    doc_path = _get_file_from_docname(docname)
+    
+    if not doc_path: 
+        raise ValueError(f"document {docname} is not exists in the storage.") 
+
+    # TODO: process like normal
+    loader = UnstructuredFileLoader(doc_path)
+
+    doc_embeds = None
+    return doc_embeds
 
 
 def get_filename(file_path):
@@ -37,26 +65,25 @@ def upload_file_handler(files):
 
     return file_paths
 
-def set_openai_api_key(api_key: str):
+def set_openai_api_key(api_key: str | None = None) -> ConversationChain:
     """Set the api key and return chain.
 
     If no api_key, then None is returned.
     """
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
-    else: 
-        os.environ["OPENAI_API_KEY"] = "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"  
 
-    chain = load_chain()
+    chain = load_simple_chat_chain()
     return chain
 
 class ChatWrapper:
 
-    def __init__(self):
+    def __init__(self, chain: ConversationChain = None):
         self.lock = Lock()
+        self.chain = chain    
+
     def __call__(
             self, 
-            api_key: str, 
             inp: str, 
             history: Optional[Tuple[str, str]], 
             chain: Optional[ConversationChain]
@@ -65,47 +92,36 @@ class ChatWrapper:
         self.lock.acquire()
         try:
             history = history or []
+
+            if chain: self.chain = chain
+
             # If chain is None, that is because no API key was provided.
-            if chain is None:
+            if self.chain is None:
                 history.append((inp, "Please paste your OpenAI key to use"))
                 return history, history
-            # Set OpenAI key
-            import openai
-            openai.api_key = api_key
+
             # Run chain and append input.
-            output = chain.run(input=inp)
+            output = self.chain.run(input=inp)
             history.append((inp, output))
+
         except Exception as e:
             raise e
         finally:
             self.lock.release()
         return history, history
 
-chat = ChatWrapper()
 
+chain = set_openai_api_key() 
+chat = ChatWrapper(chain=chain)
 block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
 
-with block:
-    css = "footer {display: none !important;} .gradio-container {min-height: 0px !important;}"
-    with gr.Tab(css=css,label="Upload Documents") as demo:
-        file_output = gr.File()
-        upload_button = gr.UploadButton(
-                    "Click to *.pdf, *.txt files", 
-                    file_types=[".txt", ".pdf"], 
-                    file_count="multiple", 
-                    save_to=SAVE_DIR)
-        upload_button.upload(upload_file_handler, upload_button, file_output)
+def update_block(): 
+    block.update()
 
+with block:
     with gr.Tab("Chat"): 
         with gr.Row():
             gr.Markdown("<h3><center>LangChain Demo</center></h3>")
-
-            openai_api_key_textbox = gr.Textbox(
-                placeholder="Paste your OpenAI API key (sk-...)",
-                show_label=False,
-                lines=1,
-                type="password",
-            )
 
         chatbot = gr.Chatbot()
         with gr.Row():
@@ -126,7 +142,6 @@ with block:
         )
 
         gr.HTML("Demo application of a LangChain chain.")
-
         gr.HTML(
             "<center>Powered by <a href='https://github.com/hwchase17/langchain'>LangChain 🦜️🔗</a></center>"
         )
@@ -135,19 +150,62 @@ with block:
         agent_state = gr.State()
 
         submit.click(chat, 
-                    inputs=[openai_api_key_textbox, message, state, agent_state], 
+                    inputs=[message, state, agent_state], 
                     outputs=[chatbot, state]
         )
 
         message.submit(chat, 
-                    inputs=[openai_api_key_textbox, message, state, agent_state], 
+                    inputs=[message, state, agent_state], 
                     outputs=[chatbot, state]
         )
 
-        openai_api_key_textbox.change(
-            set_openai_api_key,
-            inputs=[openai_api_key_textbox],
-            outputs=[agent_state],
-        )
+    css = "footer {display: none !important;} .gradio-container {min-height: 0px !important;}"
+    with gr.Tab(css=css,label="Upload Documents") as demo:
+        file_output = gr.File()
+        upload_button = gr.UploadButton(
+                    "Click to *.pdf, *.txt files", 
+                    file_types=[".txt", ".pdf"], 
+                    file_count="multiple")
+        upload_button.upload(upload_file_handler, upload_button, file_output)
 
-block.launch(debug=True, server_port=8000)
+
+
+    with gr.Tab(css=css,label="Index Documents") as demo:
+        with gr.Row():
+            files = os.listdir(SAVE_DIR)
+            exists_docs_dropdown = gr.Dropdown(files, type="value", label="Select a file:", 
+                                               default=None, placeholder="Select a file")
+            exists_docs_box = gr.Box()
+            exists_docs_box.add(exists_docs_dropdown)
+            refresh_button = gr.Button("Refresh").style(full_width=False)
+
+            def _update_files_dropdown():
+                global exists_docs_box
+                print("Updating dropdown...")
+                files = os.listdir(SAVE_DIR)
+                new_choices = [{"label": file, "value": file} for file in files]
+                new_dropdown = gr.Dropdown(new_choices, type="value", label="Select a file:", 
+                                           default=None, placeholder="Select a file")
+                exists_docs_box.children = new_dropdown
+
+            refresh_button.click(fn=_update_files_dropdown)
+
+            # def _update_files_dropdown():
+            #     files = os.listdir(SAVE_DIR)
+            #     if exists_docs_dropdown.choices != files:
+            #         exists_docs_dropdown.choices = files
+            #     return exists_docs_dropdown            
+            # refresh_button.click(fn=_update_files_dropdown, inputs=None, outputs=[exists_docs_dropdown])
+
+        chunk_slider = gr.Slider(0, 3000, step=250, label="Document Chunk Size")
+        chunk_state = gr.State(value=300)
+
+        overlap_chunk_slider = gr.Slider(0, 1250, step=20, label="Overlap Document Chunk Size")
+        overlap_chunk_state = gr.State(value=20)
+
+
+        submit = gr.Button(value="Index!", variant="secondary").style(full_width=False)
+        # TODO: execute index function here
+
+
+block.launch(debug=True, server_port=8000, show_api=True)
