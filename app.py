@@ -11,7 +11,6 @@ from langchain.llms import OpenAI
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.document_loaders import UnstructuredFileLoader
-from langchain.indexes import VectorstoreIndexCreator
 
 os.environ["OPENAI_API_KEY"] = "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"  
 SAVE_DIR = "./uploads/"
@@ -113,10 +112,9 @@ class ChatWrapper:
 
 chain = set_openai_api_key() 
 chat = ChatWrapper(chain=chain)
-block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
 
-def update_block(): 
-    block.update()
+block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
+file_options = os.listdir(SAVE_DIR)
 
 with block:
     with gr.Tab("Chat"): 
@@ -125,12 +123,12 @@ with block:
 
         chatbot = gr.Chatbot()
         with gr.Row():
-            message = gr.Textbox(
+            message_txt_box = gr.Textbox(
                 label="What's your question?",
                 placeholder="What's the answer to life, the universe, and everything?",
                 lines=1,
             )
-            submit = gr.Button(value="Send", variant="secondary").style(full_width=False)
+            submit_chat_msg_btn = gr.Button(value="Send", variant="secondary").style(full_width=False)
 
         gr.Examples(
             examples=[
@@ -138,7 +136,7 @@ with block:
                 "What should I do tonight?",
                 "Whats 2 + 2?",
             ],
-            inputs=message,
+            inputs=message_txt_box,
         )
 
         gr.HTML("Demo application of a LangChain chain.")
@@ -146,66 +144,45 @@ with block:
             "<center>Powered by <a href='https://github.com/hwchase17/langchain'>LangChain 🦜️🔗</a></center>"
         )
 
-        state = gr.State()
-        agent_state = gr.State()
-
-        submit.click(chat, 
-                    inputs=[message, state, agent_state], 
-                    outputs=[chatbot, state]
-        )
-
-        message.submit(chat, 
-                    inputs=[message, state, agent_state], 
-                    outputs=[chatbot, state]
-        )
 
     css = "footer {display: none !important;} .gradio-container {min-height: 0px !important;}"
-    with gr.Tab(css=css,label="Upload Documents") as demo:
+    with gr.Tab(css=css,label="Upload & Index Document"):
         file_output = gr.File()
         upload_button = gr.UploadButton(
-                    "Click to *.pdf, *.txt files", 
+                    "Click to upload *.pdf, *.txt files", 
                     file_types=[".txt", ".pdf"], 
                     file_count="multiple")
-        upload_button.upload(upload_file_handler, upload_button, file_output)
-
-
-
-    with gr.Tab(css=css,label="Index Documents") as demo:
+        upload_button.upload(upload_file_handler, upload_button, file_output, api_name="upload_files")
         with gr.Row():
-            files = os.listdir(SAVE_DIR)
-            exists_docs_dropdown = gr.Dropdown(files, type="value", label="Select a file:", 
-                                               default=None, placeholder="Select a file")
-            exists_docs_box = gr.Box()
-            exists_docs_box.add(exists_docs_dropdown)
-            refresh_button = gr.Button("Refresh").style(full_width=False)
+            chunk_slider = gr.Slider(0, 3000, step=250, label="Document Chunk Size")
+            chunk_state = gr.State(value=300)
 
-            def _update_files_dropdown():
-                global exists_docs_box
-                print("Updating dropdown...")
-                files = os.listdir(SAVE_DIR)
-                new_choices = [{"label": file, "value": file} for file in files]
-                new_dropdown = gr.Dropdown(new_choices, type="value", label="Select a file:", 
-                                           default=None, placeholder="Select a file")
-                exists_docs_box.children = new_dropdown
-
-            refresh_button.click(fn=_update_files_dropdown)
-
-            # def _update_files_dropdown():
-            #     files = os.listdir(SAVE_DIR)
-            #     if exists_docs_dropdown.choices != files:
-            #         exists_docs_dropdown.choices = files
-            #     return exists_docs_dropdown            
-            # refresh_button.click(fn=_update_files_dropdown, inputs=None, outputs=[exists_docs_dropdown])
-
-        chunk_slider = gr.Slider(0, 3000, step=250, label="Document Chunk Size")
-        chunk_state = gr.State(value=300)
-
-        overlap_chunk_slider = gr.Slider(0, 1250, step=20, label="Overlap Document Chunk Size")
-        overlap_chunk_state = gr.State(value=20)
+            overlap_chunk_slider = gr.Slider(0, 1250, step=20, label="Overlap Document Chunk Size")
+            overlap_chunk_state = gr.State(value=20)
 
 
-        submit = gr.Button(value="Index!", variant="secondary").style(full_width=False)
+        index_name = gr.Textbox(
+            label="Collection/Index Name",
+            placeholder="What's the name for this index? Eg: Document_ABC",
+            lines=1,
+        )
+        index_doc_btn = gr.Button(value="Index!", variant="secondary").style(full_width=False)
         # TODO: execute index function here
 
+
+    state = gr.State()
+    agent_state = gr.State()
+ 
+
+    submit_chat_msg_btn.click(chat, 
+                inputs=[message_txt_box, state, agent_state], 
+                outputs=[chatbot, state]
+    )
+
+    message_txt_box.submit(chat, 
+                inputs=[message_txt_box, state, agent_state], 
+                outputs=[chatbot, state], 
+                api_name="chats"
+    )
 
 block.launch(debug=True, server_port=8000, show_api=True)
