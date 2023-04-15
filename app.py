@@ -1,26 +1,74 @@
 import os
-import shutil
-from typing import Optional, Tuple
+from src.constants import FAISS_LOCAL_PATH
+os.environ["OPENAI_API_KEY"] = "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"
 
+import shutil
 import gradio as gr
+
+
 from langchain.chains import ConversationChain
-from langchain.llms import OpenAI
-from threading import Lock
+from langchain.chat_models import ChatOpenAI
+from langchain.agents import AgentExecutor
+from langchain.embeddings.openai import OpenAIEmbeddings
+
+
+from src.ChatWrapper.ChatWrapper import ChatWrapper
+from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
+from src.IndexDocuments.index_doc import save_index, single_pdf_indexer
 
 
 SAVE_DIR = "./uploads/"
+UPLOADED_FILES = []
+LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH) 
 
-def load_chain():
+def index_document_from_single_pdf(
+        chunk_size: int,
+        overlap_chunk: int,
+        index_name: str, 
+        progress= gr.Progress()):
+    global UPLOADED_FILES
+    print(f"{chunk_size},{overlap_chunk}, {UPLOADED_FILES}, {index_name}")
+
+    progress(0.2, "Indexing Documents....")
+    if not index_name: 
+        filename = get_filename(UPLOADED_FILES[0])
+        index_name = os.path.splitext(filename)[0]
+        
+    progress(0.5, "Indexing Documents....")
+    embeddings = OpenAIEmbeddings()
+    faiss_index = single_pdf_indexer(
+        filepath=UPLOADED_FILES[0],
+        embedding_model=embeddings)
+
+    progress(0.3, "Saving index...")
+    save_index(faiss_index, index_name=index_name)
+
+    return "Done!"
+
+
+def load_simple_chat_chain() -> ConversationChain:
     """Logic for loading the chain you want to use should go here."""
-    llm = OpenAI(temperature=0)
-    chain = ConversationChain(llm=llm)
+    chat_llm = ChatOpenAI(
+        temperature=0,
+        model_name="gpt-3.5-turbo"
+    )
+    chain = ConversationChain(llm=chat_llm)
     return chain
+
+
+def load_qa_agent(index_name: str) -> AgentExecutor:
+    agent_executor = build_qa_agent_executor(index_name=index_name)
+    return agent_executor
 
 
 def get_filename(file_path):
     return os.path.basename(file_path)
 
+
 def upload_file_handler(files):
+    global UPLOADED_FILES
+    UPLOADED_FILES = []
+
     file_paths = [file.name for file in files]
 
     # create destination directory if it doesn't exist
@@ -28,93 +76,84 @@ def upload_file_handler(files):
         os.makedirs(SAVE_DIR)
 
     # loop over all files in the source directory
+    uploads_filepath = []
     for path in file_paths:
         filename = get_filename(path)
         destination_path = os.path.join(SAVE_DIR, filename)
 
         # copy file from source to destination
         shutil.copy(path, destination_path)
+        uploads_filepath.append(destination_path)
+    UPLOADED_FILES = uploads_filepath
+    return uploads_filepath
 
-    return file_paths
 
-def set_openai_api_key(api_key: str):
+def set_openai_api_key(api_key: str | None = None) -> ConversationChain:
     """Set the api key and return chain.
 
     If no api_key, then None is returned.
     """
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
-    else: 
-        os.environ["OPENAI_API_KEY"] = "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"  
 
-    chain = load_chain()
+    chain = load_simple_chat_chain()
     return chain
 
-class ChatWrapper:
 
-    def __init__(self):
-        self.lock = Lock()
-    def __call__(
-            self, 
-            api_key: str, 
-            inp: str, 
-            history: Optional[Tuple[str, str]], 
-            chain: Optional[ConversationChain]
-    ):
-        """Execute the chat functionality."""
-        self.lock.acquire()
-        try:
-            history = history or []
-            # If chain is None, that is because no API key was provided.
-            if chain is None:
-                history.append((inp, "Please paste your OpenAI key to use"))
-                return history, history
-            # Set OpenAI key
-            import openai
-            openai.api_key = api_key
-            # Run chain and append input.
-            output = chain.run(input=inp)
-            history.append((inp, output))
-        except Exception as e:
-            raise e
-        finally:
-            self.lock.release()
-        return history, history
 
-chat = ChatWrapper()
+def change_qa_agent_handler(index_name: str) -> None: 
+    print(f"Change Agent to use collection: {index_name}")
+    print(f"Change Agent to use collection: {os.path.join(FAISS_LOCAL_PATH,index_name)}")
+
+    global chat_agent 
+    chat_agent = None
+
+    agent_executor = load_qa_agent(index_name=index_name)
+    chat_agent = ChatWrapper(agent_executor)
+    
+    #TODO: clean up chat history from the UI too 
+
+
+def refresh_collection_list_handler(): 
+    global LIST_COLLECTIONS
+    LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH) 
+    return gr.Dropdown.update(choices=LIST_COLLECTIONS)
+
+
+# chain = set_openai_api_key()
+agent_executor = load_qa_agent("test_index_week1_1")
+chat_agent = ChatWrapper(agent_executor)
 
 block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
+file_options = os.listdir(SAVE_DIR)
 
 with block:
-    css = "footer {display: none !important;} .gradio-container {min-height: 0px !important;}"
-    with gr.Tab(css=css,label="Upload Documents") as demo:
-        file_output = gr.File()
-        upload_button = gr.UploadButton(
-                    "Click to *.pdf, *.txt files", 
-                    file_types=[".txt", ".pdf"], 
-                    file_count="multiple", 
-                    save_to=SAVE_DIR)
-        upload_button.upload(upload_file_handler, upload_button, file_output)
-
-    with gr.Tab("Chat"): 
+    with gr.Tab("Chat"):
         with gr.Row():
             gr.Markdown("<h3><center>LangChain Demo</center></h3>")
 
-            openai_api_key_textbox = gr.Textbox(
-                placeholder="Paste your OpenAI API key (sk-...)",
-                show_label=False,
-                lines=1,
-                type="password",
-            )
+        with gr.Row(): 
+            index_dropdown_btn = gr.Dropdown(
+                label="Index/Collection to chat with", 
+                choices=LIST_COLLECTIONS)            
+            
+            refresh_btn = gr.Button("⟳ Refresh Collections").style(full_width=False)
+
+            index_dropdown_btn.change(change_qa_agent_handler,
+                                      inputs=index_dropdown_btn)
+
+            refresh_btn.click(fn=refresh_collection_list_handler, outputs=index_dropdown_btn)
+
 
         chatbot = gr.Chatbot()
         with gr.Row():
-            message = gr.Textbox(
+            message_txt_box = gr.Textbox(
                 label="What's your question?",
                 placeholder="What's the answer to life, the universe, and everything?",
                 lines=1,
             )
-            submit = gr.Button(value="Send", variant="secondary").style(full_width=False)
+            submit_chat_msg_btn = gr.Button(
+                value="Send", variant="secondary").style(full_width=False)
 
         gr.Examples(
             examples=[
@@ -122,32 +161,55 @@ with block:
                 "What should I do tonight?",
                 "Whats 2 + 2?",
             ],
-            inputs=message,
+            inputs=message_txt_box,
         )
 
         gr.HTML("Demo application of a LangChain chain.")
-
         gr.HTML(
             "<center>Powered by <a href='https://github.com/hwchase17/langchain'>LangChain 🦜️🔗</a></center>"
         )
 
-        state = gr.State()
-        agent_state = gr.State()
-
-        submit.click(chat, 
-                    inputs=[openai_api_key_textbox, message, state, agent_state], 
-                    outputs=[chatbot, state]
+    css = "footer {display: none !important;} .gradio-container {min-height: 0px !important;}"
+    with gr.Tab(css=css, label="Upload & Index Document"):
+        file_output = gr.File()
+        upload_button = gr.UploadButton(
+            "Click to upload *.pdf, *.txt files",
+            file_types=[".txt", ".pdf"],
+            file_count="multiple"
         )
+        upload_button.upload(upload_file_handler, upload_button,
+                             file_output, api_name="upload_files")
+        with gr.Row():
+            chunk_slider = gr.Slider(
+                0, 3500, step=250, value=1500, label="Document Chunk Size")
 
-        message.submit(chat, 
-                    inputs=[openai_api_key_textbox, message, state, agent_state], 
-                    outputs=[chatbot, state]
-        )
+            overlap_chunk_slider = gr.Slider(
+                0, 1500, step=20, value=200, label="Overlap Document Chunk Size")
 
-        openai_api_key_textbox.change(
-            set_openai_api_key,
-            inputs=[openai_api_key_textbox],
-            outputs=[agent_state],
-        )
+        index_name = gr.Textbox(
+            label="Collection/Index Name",
+            placeholder="What's the name for this index? Eg: Document_ABC",
+            lines=1)
+        index_doc_btn = gr.Button(
+            value="Index!", variant="secondary").style(full_width=False)
 
-block.launch(debug=True, server_port=8000)
+        status_text = gr.Textbox(label="Indexing Status")
+
+        index_doc_btn.click(index_document_from_single_pdf,
+                        inputs=[chunk_slider, overlap_chunk_slider, index_name], 
+                        outputs=status_text)
+
+
+    state = gr.State()
+    agent_state = gr.State()
+
+    submit_chat_msg_btn.click(chat_agent,
+                              inputs=[message_txt_box, state, agent_state],
+                              outputs=[chatbot, state])
+
+    message_txt_box.submit(chat_agent,
+                           inputs=[message_txt_box, state, agent_state],
+                           outputs=[chatbot, state],
+                           api_name="chats")
+
+block.queue(concurrency_count=10).launch(debug=True, server_port=8000, show_api=True)

@@ -165,3 +165,7 @@ cython_debug/
 uploads/*
 
 .vscode
+
+faiss/*
+.space
+.env*
