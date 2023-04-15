@@ -1,4 +1,5 @@
 import os
+from src.constants import FAISS_LOCAL_PATH
 os.environ["OPENAI_API_KEY"] = "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"
 
 import shutil
@@ -13,12 +14,12 @@ from langchain.embeddings.openai import OpenAIEmbeddings
 
 from src.ChatWrapper.ChatWrapper import ChatWrapper
 from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
-from src.IndexDocuments.index_doc import load_index, save_index, single_pdf_indexer
+from src.IndexDocuments.index_doc import save_index, single_pdf_indexer
 
 
 SAVE_DIR = "./uploads/"
 UPLOADED_FILES = []
-
+LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH) 
 
 def index_document_from_single_pdf(
         chunk_size: int,
@@ -99,10 +100,29 @@ def set_openai_api_key(api_key: str | None = None) -> ConversationChain:
     return chain
 
 
+
+def change_qa_agent_handler(index_name: str) -> None: 
+    print(f"Change Agent to use collection: {index_name}")
+    print(f"Change Agent to use collection: {os.path.join(FAISS_LOCAL_PATH,index_name)}")
+
+    global chat_agent 
+    chat_agent = None
+
+    agent_executor = load_qa_agent(index_name=index_name)
+    chat_agent = ChatWrapper(agent_executor)
+    
+    #TODO: clean up chat history from the UI too 
+
+
+def refresh_collection_list_handler(): 
+    global LIST_COLLECTIONS
+    LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH) 
+    return gr.Dropdown.update(choices=LIST_COLLECTIONS)
+
+
 # chain = set_openai_api_key()
 agent_executor = load_qa_agent("test_index_week1_1")
-
-chat = ChatWrapper(agent_executor)
+chat_agent = ChatWrapper(agent_executor)
 
 block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
 file_options = os.listdir(SAVE_DIR)
@@ -111,6 +131,19 @@ with block:
     with gr.Tab("Chat"):
         with gr.Row():
             gr.Markdown("<h3><center>LangChain Demo</center></h3>")
+
+        with gr.Row(): 
+            index_dropdown_btn = gr.Dropdown(
+                label="Index/Collection to chat with", 
+                choices=LIST_COLLECTIONS)            
+            
+            refresh_btn = gr.Button("⟳ Refresh Collections").style(full_width=False)
+
+            index_dropdown_btn.change(change_qa_agent_handler,
+                                      inputs=index_dropdown_btn)
+
+            refresh_btn.click(fn=refresh_collection_list_handler, outputs=index_dropdown_btn)
+
 
         chatbot = gr.Chatbot()
         with gr.Row():
@@ -170,11 +203,11 @@ with block:
     state = gr.State()
     agent_state = gr.State()
 
-    submit_chat_msg_btn.click(chat,
+    submit_chat_msg_btn.click(chat_agent,
                               inputs=[message_txt_box, state, agent_state],
                               outputs=[chatbot, state])
 
-    message_txt_box.submit(chat,
+    message_txt_box.submit(chat_agent,
                            inputs=[message_txt_box, state, agent_state],
                            outputs=[chatbot, state],
                            api_name="chats")

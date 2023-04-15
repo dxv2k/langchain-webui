@@ -1,4 +1,4 @@
-FAISS_LOCAL_PATH: str = "faiss"
+FAISS_LOCAL_PATH: str = "./faiss"
 
 
 AGENT_VEROBSE: bool = True
