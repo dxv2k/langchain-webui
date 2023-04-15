@@ -6,10 +6,41 @@ from langchain.llms.openai import OpenAI
 from langchain.agents import AgentExecutor
 from langchain.schema import Document
 from langchain.embeddings.openai import OpenAIEmbeddings
+from src.CustomConversationAgent.CustomConversationAgent import CustomConversationalAgent
 
 from src.IndexDocuments.index_doc import load_index
 from src.constants import AGENT_VEROBSE
 
+
+CUSTOM_FORMAT_INSTRUCTIONS ="""To use a tool, please use the following format:
+```
+Thought: Do I need to use a tool? Yes
+Action: the action to take, should be one of [{tool_names}]
+Action Input: the input to the action
+Observation: the result of the action
+```
+
+When you have a response to say to the Human, or if you do not need to use a tool, you MUST use the format:
+```
+Thought: Do I need to use a tool? No
+{ai_prefix}: [your response here]
+```
+
+---------------------------------------
+EXAMPLE 1: When you have a response to say to the Human, or if you do not need to use a tool, you MUST use the format:
+```
+Thought: Do I need to use a tool? No
+{ai_prefix}: Hello! How can I assist you today?
+```
+
+EXAMPLE 2: When you have to use a tool, please use the following format:
+```
+Thought: Do I need to use a tool? Yes
+Action: Document Search 
+Action Input: "lastest bitcoin price"  
+Observation: The database doesn't have information about bitcoin 
+```
+""" 
 
 def create_faiss_tool_from_index_name(
     name: str,  
@@ -68,12 +99,21 @@ def build_qa_agent_executor(index_name: str) -> AgentExecutor:
     tools = [create_faiss_tool_from_index_name( 
                 index_name=index_name, 
                 name="Document Search" ,
-                description="Useful when you want to search for information from documents")
+                description="Useful when you want to search for information from documents, don't use this tool for the same input/query.")
     ]
 
-    agent = ConversationalAgent.from_llm_and_tools( 
+    # NOTE: default ConversationAgent
+    # agent = ConversationalAgent.from_llm_and_tools( 
+    #     llm=chat_llm, 
+    #     tools=tools, 
+    #     format_instructions=CUSTOM_FORMAT_INSTRUCTIONS
+    # )
+
+    # NOTE: CustomConversationAgent -> add more error handling
+    agent = CustomConversationalAgent.from_llm_and_tools( 
         llm=chat_llm, 
-        tools=tools
+        tools=tools, 
+        format_instructions=CUSTOM_FORMAT_INSTRUCTIONS
     )
 
     executor = AgentExecutor.from_agent_and_tools( 

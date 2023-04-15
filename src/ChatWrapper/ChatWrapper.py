@@ -1,34 +1,38 @@
 from typing import Optional, Tuple
 
-from langchain.chains import ConversationChain
 from threading import Lock
+from langchain.chains import ConversationChain
+
+
+from src.CustomConversationAgent.CustomConversationAgent import CustomConversationalAgent
 
 class ChatWrapper:
 
-    def __init__(self, chain: ConversationChain = None):
+    def __init__(self, 
+                 agent: CustomConversationalAgent = None):
         self.lock = Lock()
-        self.chain = chain    
+        self.agent = agent    
 
     def __call__(
             self, 
             inp: str, 
             history: Optional[Tuple[str, str]], 
-            chain: Optional[ConversationChain]
+            agent: Optional[CustomConversationalAgent]
     ):
         """Execute the chat functionality."""
         self.lock.acquire()
         try:
             history = history or []
 
-            if chain: self.chain = chain
+            if agent: self.agent = agent
 
             # If chain is None, that is because no API key was provided.
-            if self.chain is None:
+            if self.agent is None:
                 history.append((inp, "Please paste your OpenAI key to use"))
                 return history, history
 
             # Run chain and append input.
-            output = self.chain.run(input=inp)
+            output = self.agent.run(input=inp)
             history.append((inp, output))
 
         except Exception as e:
