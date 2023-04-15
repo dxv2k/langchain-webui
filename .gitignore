@@ -167,3 +167,5 @@ uploads/*
 .vscode
 
 faiss/*
+.space
+.env*
