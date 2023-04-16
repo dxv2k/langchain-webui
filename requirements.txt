@@ -74,4 +74,5 @@ urllib3==1.26.15
 uvicorn==0.21.1
 websockets==11.0.1
 yarl==1.8.2
-tiktoken
+tiktoken==0.3.3
+pypdf==3.7.1
