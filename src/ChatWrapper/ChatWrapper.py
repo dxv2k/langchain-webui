@@ -2,14 +2,14 @@ from typing import Optional, Tuple
 
 from threading import Lock
 from langchain.chains import ConversationChain
-
+from langchain.agents import AgentExecutor
 
 from src.CustomConversationAgent.CustomConversationAgent import CustomConversationalAgent
 
 class ChatWrapper:
 
     def __init__(self, 
-                 agent: CustomConversationalAgent = None):
+                 agent: AgentExecutor = None):
         self.lock = Lock()
         self.agent = agent    
 
@@ -17,7 +17,7 @@ class ChatWrapper:
             self, 
             inp: str, 
             history: Optional[Tuple[str, str]], 
-            agent: Optional[CustomConversationalAgent]
+            agent: Optional[AgentExecutor]
     ):
         """Execute the chat functionality."""
         self.lock.acquire()
@@ -40,3 +40,12 @@ class ChatWrapper:
         finally:
             self.lock.release()
         return history, history
+
+    def clear_agent_memory(self) -> None: 
+        if not self.agent: 
+            raise ValueError("ChatWrapper doesn't have an agent yet") 
+
+        try: 
+            self.agent.memory.clear()
+        except Exception as e: 
+            raise(e)
