@@ -212,4 +212,9 @@ with block:
                            outputs=[chatbot, state],
                            api_name="chats")
 
-block.queue(concurrency_count=10).launch(debug=True, server_port=8000, show_api=True)
+block.queue(concurrency_count=10).launch(
+    auth=("admin","1234@abcezIJK1"), 
+    debug=True, 
+    server_port=8000, 
+    show_api=True
+)
