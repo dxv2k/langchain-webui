@@ -91,16 +91,18 @@ def create_faiss_tool_from_index_name(
     ) 
 
 
-def build_qa_agent_executor(index_name: str) -> AgentExecutor:  
+def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:  
     chat_llm = ChatOpenAI(temperature=0, max_tokens=None)
     
     memory = ConversationBufferMemory(memory_key="chat_history", output_key='output')
+    tools = []
 
-    tools = [create_faiss_tool_from_index_name( 
+    if index_name: 
+        tools.append(create_faiss_tool_from_index_name( 
                 index_name=index_name, 
                 name="Document Search" ,
                 description="Useful when you want to search for information from documents, don't use this tool for the same input/query.")
-    ]
+        )
 
     # NOTE: default ConversationAgent
     # agent = ConversationalAgent.from_llm_and_tools( 
