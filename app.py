@@ -10,19 +10,23 @@ from langchain.chat_models import ChatOpenAI
 from langchain.agents import AgentExecutor
 from langchain.embeddings.openai import OpenAIEmbeddings
 
-
 from src.constants import FAISS_LOCAL_PATH, SAVE_DIR
+from src.utils.logger import get_logger
 from src.ChatWrapper.ChatWrapper import ChatWrapper
 from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
 from src.IndexDocuments.index_doc import save_index, single_pdf_indexer
 
+
+logger = get_logger()
+
+
 def prepare_project_dir() -> None: 
     if not os.path.exists(FAISS_LOCAL_PATH): 
-        print(f"created {FAISS_LOCAL_PATH}")
+        logger.info(f"created {FAISS_LOCAL_PATH}")
         os.mkdir(FAISS_LOCAL_PATH)
 
     if not os.path.exists(SAVE_DIR): 
-        print(f"created {SAVE_DIR}")
+        logger.info(f"created {SAVE_DIR}")
         os.mkdir(SAVE_DIR)
 
 
@@ -37,7 +41,7 @@ def index_document_from_single_pdf_handler(
         index_name: str, 
         progress= gr.Progress()) -> str:
     global UPLOADED_FILES # NOTE: dirty way to do similar to gr.State()
-    print(f"{chunk_size},{overlap_chunk}, {UPLOADED_FILES}, {index_name}")
+    logger.info(f"{chunk_size},{overlap_chunk}, {UPLOADED_FILES}, {index_name}")
 
     progress(0.2, "Indexing Documents....")
     if not index_name: 
@@ -52,7 +56,7 @@ def index_document_from_single_pdf_handler(
 
     progress(0.3, "Saving index...")
     save_index(faiss_index, index_name=index_name)
-
+    logger.info(f"Indexing complete & saving {faiss_index}....")
     return "Done!"
 
 
@@ -112,8 +116,7 @@ def set_openai_api_key(api_key: str | None = None) -> ConversationChain:
 
 
 def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot) -> gr.Chatbot: 
-    print(f"Change Agent to use collection: {index_name}")
-    print(f"Change Agent to use collection: {os.path.join(FAISS_LOCAL_PATH,index_name)}")
+    logger.info(f"Change Agent to use collection: {index_name}")
 
     global chat_agent # NOTE: dirty way to do similar to gr.State() 
     chat_agent = None
@@ -133,6 +136,7 @@ def refresh_collection_list_handler() -> gr.Dropdown:
 def clear_chat_history_handler(): 
     global chat_agent # NOTE: dirty way to do similar to gr.State()
     chat_agent.clear_agent_memory()
+    logger.info(f"Clear agent memory...")
     return gr.Chatbot.update(value=[]), None, None 
 
 
@@ -142,7 +146,6 @@ agent_executor = load_qa_agent()
 chat_agent = ChatWrapper(agent_executor)
 
 def app() -> gr.Blocks: 
-
     # chain = set_openai_api_key()
 
     global chat_agent # NOTE: dirty way to do similar to gr.State()
@@ -277,7 +280,7 @@ if __name__ == "__main__":
     server_port = args.port 
     is_show_api = args.show_api 
 
-    print(args)
+    logger.info(f"Starting server with config: {args}")
 
     block = app() 
     
