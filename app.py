@@ -72,6 +72,8 @@ def load_simple_chat_chain() -> ConversationChain:
 
 def load_qa_agent(index_name: str = None) -> AgentExecutor:
     agent_executor = build_qa_agent_executor(index_name=index_name)
+    logger.info(f"Agent has access to following tools {agent_executor.tools}")
+    logger.info(f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
     return agent_executor
 
 
@@ -115,7 +117,7 @@ def set_openai_api_key(api_key: str | None = None) -> ConversationChain:
     return chain
 
 
-def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot) -> gr.Chatbot: 
+def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot): 
     logger.info(f"Change Agent to use collection: {index_name}")
 
     global chat_agent # NOTE: dirty way to do similar to gr.State() 
@@ -125,7 +127,7 @@ def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot) -> gr.Chatbot:
     chat_agent = ChatWrapper(agent_executor)
     
     #TODO: clean up chat history from the UI too 
-    return gr.Chatbot.update(value=[]), None, None 
+    return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature) 
 
 
 def refresh_collection_list_handler() -> gr.Dropdown: 
@@ -139,10 +141,13 @@ def clear_chat_history_handler():
     logger.info(f"Clear agent memory...")
     return gr.Chatbot.update(value=[]), None, None 
 
+def change_temperature_llm_handler(temperature: float) -> gr.Slider: 
+    global chat_agent
+    agent_executor.agent.llm_chain.llm.temperature = temperature
+    logger.info(f"Change LLM temperature to {agent_executor.agent.llm_chain.llm.temperature}")
 
 
-
-agent_executor = load_qa_agent()
+agent_executor = load_qa_agent("epsom form feed")
 chat_agent = ChatWrapper(agent_executor)
 
 def app() -> gr.Blocks: 
@@ -164,6 +169,14 @@ def app() -> gr.Blocks:
                 
                 refresh_btn = gr.Button("⟳ Refresh Collections").style(full_width=False)
 
+            temperature_llm_slider = gr.Slider(0, 2, step=0.2, value=0.1, label="Temperature")
+
+            temperature_llm_slider.change( 
+                change_temperature_llm_handler, 
+                inputs=temperature_llm_slider
+            )
+
+
             chatbot = gr.Chatbot()
             with gr.Row():
                 message_txt_box = gr.Textbox(
@@ -176,7 +189,8 @@ def app() -> gr.Blocks:
                         value="Send", variant="primary").style(full_width=False)
 
                 clear_chat_history_btn = gr.Button(
-                    value="Clear chat history (will clear chatbot memory)", variant="stop").style(full_width=False)
+                    value="Clear chat history (will clear chatbot memory)", 
+                    variant="stop").style(full_width=False)
 
                 
 
@@ -206,10 +220,10 @@ def app() -> gr.Blocks:
                                 file_output, api_name="upload_files")
             with gr.Row():
                 chunk_slider = gr.Slider(
-                    0, 3500, step=250, value=1500, label="Document Chunk Size")
+                    0, 3500, step=250, value=1000, label="Document Chunk Size")
 
                 overlap_chunk_slider = gr.Slider(
-                    0, 1500, step=20, value=200, label="Overlap Document Chunk Size")
+                    0, 1500, step=20, value=40, label="Overlap Document Chunk Size")
 
             index_name = gr.Textbox(
                 label="Collection/Index Name",
@@ -230,7 +244,7 @@ def app() -> gr.Blocks:
 
         index_dropdown_btn.change(change_qa_agent_handler,
                                 inputs=index_dropdown_btn, 
-                                outputs=[chatbot,state,agent_state])
+                                outputs=[chatbot,state,agent_state, temperature_llm_slider])
         clear_chat_history_btn.click(
                     clear_chat_history_handler, 
                     outputs=[chatbot,state, agent_state]
