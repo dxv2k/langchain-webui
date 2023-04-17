@@ -12,6 +12,29 @@ from src.IndexDocuments.index_doc import load_index
 from src.constants import AGENT_VEROBSE
 
 
+CUSTOM_PREFIX = """Assistant is a large language model trained by OpenAI.
+
+Assistant is desgined to do only one job is answering question from the user's document, providing in-depth explanations and discussion on wide range of topics that related to user's document. As a language model, Assistant is able to generate human-like text based on the input it receives, allowing it to engage in natural-sounding conversations and provide responses that are coherent and relevant to the topic at hand. 
+
+Assistant is constantly learning and improving, and its capabilities are constantly evolving. It is able to process and understand large amounts of text, and can use this knowledge to provide accurate and informative responses to a wide range of questions. Additionally, Assistant is able to generate its own text based on the input it receives, allowing it to engage in discussions and provide explanations and descriptions on a wide range of topics.
+
+Overall, Assistant is a powerful tool that can help with a wide range of tasks and provide valuable insights and information on a wide range of topics. Whether you need help with a specific question or just want to have a conversation about a particular topic, Assistant is here to assist.
+
+At the end of your response, you must provide the user 3 following questions about the given topics by this following format: 
+----- 
+RELEVANT QUESTION: 
+1. RELEVANT_QUESTION_1
+2. RELEVANT_QUESTION_2
+3. RELEVANT_QUESTION_3
+----- 
+
+
+TOOLS:
+------
+
+Assistant has access to the following tools:""" 
+
+
 CUSTOM_FORMAT_INSTRUCTIONS ="""To use a tool, please use the following format:
 ```
 Thought: Do I need to use a tool? Yes
@@ -42,19 +65,35 @@ Observation: The database doesn't have information about bitcoin
 ```
 """ 
 
+
+CUSTOM_SUFFIX = """Begin!
+
+Previous conversation history:
+{chat_history}
+
+New input: {input}
+{agent_scratchpad}"""
+
+
+
 def create_faiss_tool_from_index_name(
     name: str,  
     description: str,
     index_name: str, 
-    top_k: int = 3, 
+    top_k: int = 10, 
     return_source_documents: bool = False, 
-    chain_type="stuff" 
-): 
+    chain_type="map_reduce" 
+) -> Tool: 
+    _validate_chain_type(chain_type) 
+
     completion_llm = OpenAI(temperature=0, max_tokens=-1)
+    if chain_type == "map_reduce": 
+        completion_llm = OpenAI(temperature=0)
 
     embeddings = OpenAIEmbeddings()  
     vectorstore = load_index(index_name=index_name, embedding_model=embeddings) 
 
+    # TODO: replace this with retrievalQA
     search_func = VectorDBQA.from_chain_type(llm=completion_llm,
                                 chain_type=chain_type,
                                 vectorstore=vectorstore,
@@ -92,7 +131,7 @@ def create_faiss_tool_from_index_name(
 
 
 def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:  
-    chat_llm = ChatOpenAI(temperature=0, max_tokens=None)
+    chat_llm = ChatOpenAI(temperature=0.2, max_tokens=None)
     
     memory = ConversationBufferMemory(memory_key="chat_history", output_key='output')
     tools = []
@@ -100,8 +139,8 @@ def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:
     if index_name: 
         tools.append(create_faiss_tool_from_index_name( 
                 index_name=index_name, 
-                name="Document Search" ,
-                description="Useful when you want to search for information from documents, don't use this tool for the same input/query.")
+                name=f"{index_name} Document Search" ,
+                description=f"This is your only tool, useful when you want to search for information from {index_name} documents, don't use this tool for the same input/query.")
         )
 
     # NOTE: default ConversationAgent
@@ -115,6 +154,7 @@ def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:
     agent = CustomConversationalAgent.from_llm_and_tools( 
         llm=chat_llm, 
         tools=tools, 
+        prefix=CUSTOM_PREFIX, 
         format_instructions=CUSTOM_FORMAT_INSTRUCTIONS
     )
 
@@ -127,3 +167,7 @@ def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:
 
     return executor 
 
+def _validate_chain_type(chain_type) -> ValueError | None:
+    allowed_types = ["stuff", "map_reduce", "refine", "map_rerank"]
+    if chain_type not in allowed_types:
+        raise ValueError(f"Invalid chain_type: {chain_type}. Allowed types are {allowed_types}")
