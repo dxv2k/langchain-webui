@@ -7,7 +7,7 @@ import os
 
 from src.constants import FAISS_LOCAL_PATH
 
-os.environ["OPENAI_API_KEY"] = "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"
+# os.environ["OPENAI_API_KEY"] = "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"
 
 
 def single_ppt_indexer( 

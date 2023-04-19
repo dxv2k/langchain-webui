@@ -76,3 +76,4 @@ websockets==11.0.1
 yarl==1.8.2
 tiktoken==0.3.3
 pypdf==3.7.1
+llama-index==0.5.17.post1

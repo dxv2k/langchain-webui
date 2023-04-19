@@ -1,8 +1,9 @@
+from threading import Lock
 from typing import Optional, Tuple
 
-from threading import Lock
 from langchain.chains import ConversationChain
 from langchain.agents import AgentExecutor
+from langchain.memory import ConversationBufferMemory
 
 from src.CustomConversationAgent.CustomConversationAgent import CustomConversationalAgent
 
@@ -47,5 +48,8 @@ class ChatWrapper:
 
         try: 
             self.agent.memory.clear()
+            memory = ConversationBufferMemory(memory_key="chat_history")
+            self.agent.memory = None
+            self.agent.memory = memory
         except Exception as e: 
             raise(e)
