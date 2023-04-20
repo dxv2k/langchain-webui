@@ -167,7 +167,7 @@ uploads/*
 .vscode
 
 faiss/*
-GPTIndex/*
+GPTIndexEmbeddings/*
 .space
 .env*
 .jupyter_env

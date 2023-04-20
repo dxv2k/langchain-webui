@@ -50,10 +50,12 @@ def save_index(index: GPTSimpleVectorIndex, index_name: str) -> None:
 
 
 def load_index(index_name: str, llm_predictor: LLMPredictor = None) -> GPTSimpleVectorIndex:
-    index_name = os.path.join(GPT_INDEX_LOCAL_PATH, index_name)
 
-    if not os.path.exists(index_name):
-        raise ValueError(f"{index_name} not exists")
+    if index_name not in os.listdir(GPT_INDEX_LOCAL_PATH): 
+        print(os.listdir(GPT_INDEX_LOCAL_PATH))
+        raise ValueError(f"`{index_name}` not exists")
+
+    index_path = os.path.join(GPT_INDEX_LOCAL_PATH, index_name)
 
     if not llm_predictor:
         llm = OpenAI(temperature=0.2, max_tokens=-1)
@@ -62,7 +64,7 @@ def load_index(index_name: str, llm_predictor: LLMPredictor = None) -> GPTSimple
             llm_predictor=llm_predictor)
 
     loaded_index = GPTSimpleVectorIndex.load_from_disk(
-        save_path=index_name,
+        save_path=index_path,
         service_context=service_context
     )
 

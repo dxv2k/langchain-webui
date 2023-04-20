@@ -1,6 +1,6 @@
 FAISS_LOCAL_PATH: str = "./faiss"
 
-GPT_INDEX_LOCAL_PATH: str = "./GPTIndexDocument"
+GPT_INDEX_LOCAL_PATH: str = "./GPTIndexEmbeddings"
 
 SAVE_DIR: str = "./uploads/"
 
