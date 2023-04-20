@@ -19,10 +19,10 @@ def create_tool_from_index_name(
     loaded_index = load_index(index_name=index_name)
 
     if not name:
-        name = f"Vector Index {index_name}"
+        name = f"Vector Index for {index_name} Documents"
 
     if not description:
-        description = f"useful for when you want to answer queries about the {index_name}"
+        description = f"This is your only tool, useful for when you want to answer queries about the {index_name} documents. DO NOT use this tool for the same input/query. "
 
     tool_config = [IndexToolConfig(
         index=loaded_index,
