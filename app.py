@@ -105,13 +105,6 @@ def load_qa_agent(index_name: str = None) -> AgentExecutor:
         f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
     return agent_executor
 
-def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
-    agent_executor = build_gpt_index_chat_agent_executor(index_name=index_name)
-    logger.info(f"GPTIndex Agent has access to following tools {agent_executor.tools}")
-    logger.info(
-        f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
-    return agent_executor
-
 
 def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
     logger.info(
