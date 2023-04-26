@@ -48,8 +48,8 @@ class ChatWrapper:
 
         try: 
             self.agent.memory.clear()
-            memory = ConversationBufferMemory(memory_key="chat_history")
             self.agent.memory = None
+            memory = ConversationBufferMemory(memory_key="chat_history")
             self.agent.memory = memory
         except Exception as e: 
             raise(e)

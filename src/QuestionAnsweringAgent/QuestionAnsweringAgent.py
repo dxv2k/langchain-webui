@@ -7,6 +7,7 @@ from langchain.agents import AgentExecutor
 from langchain.schema import Document
 from langchain.embeddings.openai import OpenAIEmbeddings
 from src.CustomConversationAgent.CustomConversationAgent import CustomConversationalAgent
+from typing import Union
 
 from src.IndexDocuments.index_doc import load_index
 from src.constants import AGENT_VEROBSE
@@ -167,7 +168,7 @@ def build_qa_agent_executor(index_name: str = None) -> AgentExecutor:
 
     return executor 
 
-def _validate_chain_type(chain_type) -> ValueError | None:
+def _validate_chain_type(chain_type) -> Union[ValueError, None]: 
     allowed_types = ["stuff", "map_reduce", "refine", "map_rerank"]
     if chain_type not in allowed_types:
         raise ValueError(f"Invalid chain_type: {chain_type}. Allowed types are {allowed_types}")

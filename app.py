@@ -1,7 +1,7 @@
 from typing import Union
 import src.GPTIndexDocument.index_doc as gpt_index
 from src.constants import FAISS_LOCAL_PATH, SAVE_DIR, GPT_INDEX_LOCAL_PATH
-from src.QuestionAnsweringAgent.GPTIndexAgent import build_gpt_index_chat_agent_executor
+from src.QuestionAnsweringAgent.GPTIndexAgent import build_chat_agent_executor, build_gpt_index_chat_agent_executor, create_pandas_dataframe_tool
 from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
 import src.IndexDocuments.index_doc as langchain_index
 from src.ChatWrapper.ChatWrapper import ChatWrapper
@@ -13,7 +13,11 @@ from langchain.chains import ConversationChain
 import gradio as gr
 import shutil
 import os
-os.environ["OPENAI_API_KEY"] = "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"
+import dotenv
+from os import getenv
+
+dotenv.load_dotenv()
+assert getenv("OPENAI_API_KEY") is not None, "OPENAI_API_KEY not set in .env"
 
 
 def prepare_project_dir() -> None:
@@ -30,12 +34,12 @@ def prepare_project_dir() -> None:
         os.mkdir(SAVE_DIR)
 
 
-logger = get_logger()
-prepare_project_dir()
+# logger = get_logger()
+# prepare_project_dir()
 
-UPLOADED_FILES = []
-LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
-GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
+# UPLOADED_FILES = []
+# LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
+# GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
 
 
 def index_document_from_single_pdf_handler(
@@ -105,18 +109,22 @@ def load_qa_agent(index_name: str = None) -> AgentExecutor:
         f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
     return agent_executor
 
-def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
-    agent_executor = build_gpt_index_chat_agent_executor(index_name=index_name)
-    logger.info(f"GPTIndex Agent has access to following tools {agent_executor.tools}")
-    logger.info(
-        f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
-    return agent_executor
-
 
 def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
     logger.info(
         f"======================Using GPTIndex Agent======================")
-    agent_executor = build_gpt_index_chat_agent_executor(index_name=index_name)
+
+    additional_tools = [ 
+        create_pandas_dataframe_tool(
+            filepath="./sample_data/All Fizzy Living Reviews - Tidied.csv")
+    ] 
+
+    agent_executor = build_chat_agent_executor(
+        index_name=index_name, 
+        additional_tools=additional_tools
+    )
+    # agent_executor = build_gpt_index_chat_agent_executor(index_name=index_name)
+
     logger.info(f"Agent has access to following tools {agent_executor.tools}")
     logger.info(
         f"Agent used temperature: {agent_executor.agent.llm_chain.llm.temperature}")
@@ -242,12 +250,6 @@ def chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.St
 
 
 # -------------------------------------------------------------------------------
-agent_executor = load_qa_agent("epsom form feed")
-chat_agent = ChatWrapper(agent_executor)
-
-gpt_index_agent_executor = load_gpt_index_agent("epsom form feed mini")
-chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
-
 # -------------------------------------------------------------------------------
 
 
@@ -261,6 +263,9 @@ def app() -> gr.Blocks:
 
             with gr.Row():
                 gpt_index_dropdown_btn = gr.Dropdown(
+                    value=GPT_INDEX_LIST_COLLECTIONS[0] \
+                            if GPT_INDEX_LIST_COLLECTIONS \
+                            else None,  
                     label="Index/Collection to chat with",
                     choices=GPT_INDEX_LIST_COLLECTIONS)
 
@@ -339,6 +344,7 @@ def app() -> gr.Blocks:
 
             with gr.Row():
                 index_dropdown_btn = gr.Dropdown(
+                    value=LIST_COLLECTIONS[0],  
                     label="Index/Collection to chat with",
                     choices=LIST_COLLECTIONS)
 
@@ -504,10 +510,24 @@ if __name__ == "__main__":
     server_port = args.port
     is_show_api = args.show_api
 
+    logger = get_logger()
+    prepare_project_dir()
+
     logger.info(f"Starting server with config: {args}")
 
-    block = app()
+    # Declared global variable scope
+    UPLOADED_FILES = []
+    LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
+    GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
 
+    agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
+    chat_agent = ChatWrapper(agent_executor)
+    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0])
+    chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
+
+
+
+    block = app()
     block.queue(concurrency_count=n_concurrency).launch(
         auth=(username, password),
         debug=debug,
