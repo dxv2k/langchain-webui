@@ -31,7 +31,7 @@ idna==3.4
 Jinja2==3.1.2
 jsonschema==4.17.3
 kiwisolver==1.4.4
-langchain==0.0.136
+langchain==0.0.142
 linkify-it-py==2.0.0
 markdown-it-py==2.2.0
 MarkupSafe==2.1.2
@@ -77,3 +77,4 @@ yarl==1.8.2
 tiktoken==0.3.3
 pypdf==3.7.1
 llama-index==0.5.17.post1
+python-dotenv==1.0.0

@@ -52,8 +52,7 @@ def save_index(index: GPTSimpleVectorIndex, index_name: str) -> None:
 def load_index(index_name: str, llm_predictor: LLMPredictor = None) -> GPTSimpleVectorIndex:
 
     if index_name not in os.listdir(GPT_INDEX_LOCAL_PATH): 
-        print(os.listdir(GPT_INDEX_LOCAL_PATH))
-        raise ValueError(f"`{index_name}` not exists")
+        raise ValueError(f"`{index_name}` not exists in {GPT_INDEX_LOCAL_PATH}")
 
     index_path = os.path.join(GPT_INDEX_LOCAL_PATH, index_name)
 
