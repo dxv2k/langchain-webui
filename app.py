@@ -284,6 +284,8 @@ def app() -> gr.Blocks:
             csv_gpt_upload_button.upload(csv_upload_file_handler, csv_gpt_upload_button,
                                  csv_file_output, api_name="upload_csv_files")
 
+            gr.HTML("Chatbot Config")
+
             with gr.Row():
                 csv_dropdown_btn = gr.Dropdown( 
                     value=CSV_LIST_COLLECTIONS[0] 
@@ -307,6 +309,7 @@ def app() -> gr.Blocks:
                 inputs=gpt_temperature_llm_slider 
             )
 
+            gr.HTML("Chat with GPT-Index")
             gpt_index_chatbot = gr.Chatbot()
             with gr.Row():
                 gpt_message_txt_box = gr.Textbox(
