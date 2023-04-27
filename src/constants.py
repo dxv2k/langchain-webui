@@ -4,6 +4,8 @@ GPT_INDEX_LOCAL_PATH: str = "./GPTIndexEmbeddings"
 
 SAVE_DIR: str = "./uploads/"
 
+CSV_UPLOADED_FOLDER: str = "./uploaded_csv"
+
 AGENT_VEROBSE: bool = True
 
 

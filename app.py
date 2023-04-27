@@ -1,10 +1,11 @@
 from typing import Union
 import src.GPTIndexDocument.index_doc as gpt_index
-from src.constants import FAISS_LOCAL_PATH, SAVE_DIR, GPT_INDEX_LOCAL_PATH
+from src.constants import CSV_UPLOADED_FOLDER, FAISS_LOCAL_PATH, SAVE_DIR, GPT_INDEX_LOCAL_PATH
 from src.QuestionAnsweringAgent.GPTIndexAgent import build_chat_agent_executor, build_gpt_index_chat_agent_executor, create_pandas_dataframe_tool
 from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
 import src.IndexDocuments.index_doc as langchain_index
 from src.ChatWrapper.ChatWrapper import ChatWrapper
+from src.utils.prepare_project import prepare_project_dir
 from src.utils.logger import get_logger
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.agents import AgentExecutor
@@ -18,28 +19,6 @@ from os import getenv
 
 dotenv.load_dotenv()
 assert getenv("OPENAI_API_KEY") is not None, "OPENAI_API_KEY not set in .env"
-
-
-def prepare_project_dir() -> None:
-    if not os.path.exists(FAISS_LOCAL_PATH):
-        logger.info(f"created {FAISS_LOCAL_PATH}")
-        os.mkdir(FAISS_LOCAL_PATH)
-
-    if not os.path.exists(GPT_INDEX_LOCAL_PATH):
-        logger.info(f"created {GPT_INDEX_LOCAL_PATH}")
-        os.mkdir(GPT_INDEX_LOCAL_PATH)
-
-    if not os.path.exists(SAVE_DIR):
-        logger.info(f"created {SAVE_DIR}")
-        os.mkdir(SAVE_DIR)
-
-
-# logger = get_logger()
-# prepare_project_dir()
-
-# UPLOADED_FILES = []
-# LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
-# GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
 
 
 def index_document_from_single_pdf_handler(
@@ -110,14 +89,15 @@ def load_qa_agent(index_name: str = None) -> AgentExecutor:
     return agent_executor
 
 
-def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
+# NOTE: must remove type annotation when multi-input function
+def load_gpt_index_agent(index_name, csv_filepath) -> AgentExecutor:
     logger.info(
         f"======================Using GPTIndex Agent======================")
-
-    additional_tools = [ 
-        create_pandas_dataframe_tool(
-            filepath="./sample_data/All Fizzy Living Reviews - Tidied.csv")
-    ] 
+    additional_tools = []
+    if csv_filepath:  
+        _path = os.path.join(CSV_UPLOADED_FOLDER,csv_filepath) 
+        additional_tools.append(
+            create_pandas_dataframe_tool(filepath=_path)) 
 
     agent_executor = build_chat_agent_executor(
         index_name=index_name, 
@@ -133,6 +113,25 @@ def load_gpt_index_agent(index_name: str = None) -> AgentExecutor:
 
 def get_filename(file_path) -> str:
     return os.path.basename(file_path)
+
+def csv_upload_file_handler(files) -> list[str]:
+    # global UPLOADED_FILES  # NOTE: dirty way to do similar to gr.State()
+    # UPLOADED_FILES = []
+
+    file_paths = [file.name for file in files]
+
+    # loop over all files in the source directory
+    uploads_filepath = []
+    for path in file_paths:
+        filename = get_filename(path)
+        destination_path = os.path.join(CSV_UPLOADED_FOLDER, filename)
+
+        # copy file from source to destination
+        shutil.copy(path, destination_path)
+        uploads_filepath.append(destination_path)
+
+    # UPLOADED_FILES = uploads_filepath
+    return uploads_filepath
 
 
 def upload_file_handler(files) -> list[str]:
@@ -183,6 +182,18 @@ def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Ch
     return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
 
 
+def change_csv_tool_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Chatbot, None, None, gr.Slider]:
+    logger.info(f"Change GPTIndex Agent to use collection: {index_name}")
+
+    global chat_gpt_index_agent   # NOTE: dirty way to do similar to gr.State()
+    chat_gpt_index_agent = None
+
+    agent_executor = load_gpt_index_agent(index_name=index_name)
+    chat_gpt_index_agent = ChatWrapper(agent_executor)
+
+    return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
+
+
 def change_gpt_index_agent_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Chatbot, None, None, gr.Slider]:
     logger.info(f"Change GPTIndex Agent to use collection: {index_name}")
 
@@ -201,10 +212,15 @@ def refresh_collection_list_handler() -> gr.Dropdown:
     return gr.Dropdown.update(choices=LIST_COLLECTIONS)
 
 
-def gpt_index_refresh_collection_list_handler() -> gr.Dropdown:
+# TODO: modified it to have csv 
+def gpt_index_refresh_collection_list_handler() -> Union[gr.Dropdown, gr.Dropdown]:
     global GPT_INDEX_LIST_COLLECTIONS  # NOTE: dirty way to do similar to gr.State()
+    global CSV_LIST_COLLECTIONS # NOTE: dirty way to do similar to gr.State()
+
     GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
-    return gr.Dropdown.update(choices=GPT_INDEX_LIST_COLLECTIONS)
+    CSV_LIST_COLLECTIONS = os.listdir(CSV_UPLOADED_FOLDER)
+
+    return gr.Dropdown.update(choices=GPT_INDEX_LIST_COLLECTIONS), gr.Dropdown.update(choices=CSV_LIST_COLLECTIONS)
 
 
 def clear_chat_history_handler() -> Union[gr.Chatbot, None, None]:
@@ -250,8 +266,6 @@ def chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.St
 
 
 # -------------------------------------------------------------------------------
-# -------------------------------------------------------------------------------
-
 
 def app() -> gr.Blocks:
     block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
@@ -261,12 +275,28 @@ def app() -> gr.Blocks:
             with gr.Row():
                 gr.Markdown("<h3><center>GPTIndex + LangChain Demo</center></h3>")
 
+            csv_file_output = gr.File()
+            csv_gpt_upload_button = gr.UploadButton(
+                "Click to upload *.csv files",
+                file_types=[".csv" ],
+                file_count="multiple"
+            )
+            csv_gpt_upload_button.upload(csv_upload_file_handler, csv_gpt_upload_button,
+                                 csv_file_output, api_name="upload_csv_files")
+
             with gr.Row():
+                csv_dropdown_btn = gr.Dropdown( 
+                    value=CSV_LIST_COLLECTIONS[0] 
+                            if CSV_LIST_COLLECTIONS 
+                            else None, 
+                    label="Dataframe Tool to chat with",
+                    choices=CSV_LIST_COLLECTIONS)                
+
                 gpt_index_dropdown_btn = gr.Dropdown(
                     value=GPT_INDEX_LIST_COLLECTIONS[0] \
                             if GPT_INDEX_LIST_COLLECTIONS \
                             else None,  
-                    label="Index/Collection to chat with",
+                    label="Index/Collection (Vector Index Tool) to chat with",
                     choices=GPT_INDEX_LIST_COLLECTIONS)
 
                 gpt_refresh_btn = gr.Button("⟳ Refresh Collections").style(full_width=False)
@@ -344,7 +374,9 @@ def app() -> gr.Blocks:
 
             with gr.Row():
                 index_dropdown_btn = gr.Dropdown(
-                    value=LIST_COLLECTIONS[0],  
+                    value=LIST_COLLECTIONS[0]  
+                        if LIST_COLLECTIONS \
+                        else None,  
                     label="Index/Collection to chat with",
                     choices=LIST_COLLECTIONS)
 
@@ -448,8 +480,14 @@ def app() -> gr.Blocks:
         gpt_state = gr.State()
         gpt_agent_state = gr.State()
 
+        # NOTE: Multi inputs function must remove type annotation 
+        csv_dropdown_btn.change(load_gpt_index_agent, 
+                            inputs=[gpt_index_dropdown_btn,csv_dropdown_btn],
+                            outputs=[gpt_index_chatbot, gpt_state, gpt_agent_state, gpt_temperature_llm_slider])
+
+
         gpt_index_dropdown_btn.change(change_gpt_index_agent_handler,
-                                  inputs=gpt_index_dropdown_btn,
+                                  inputs=[gpt_index_dropdown_btn,csv_dropdown_btn],
                                   outputs=[gpt_index_chatbot, gpt_state, gpt_agent_state, gpt_temperature_llm_slider])
 
 
@@ -465,7 +503,7 @@ def app() -> gr.Blocks:
                                    api_name="chats_gpt_index")
 
         gpt_refresh_btn.click(fn=gpt_index_refresh_collection_list_handler,
-                          outputs=gpt_index_dropdown_btn)
+                          outputs=[gpt_index_dropdown_btn, csv_dropdown_btn])
 
 
         gpt_clear_chat_history_btn.click(
@@ -511,7 +549,7 @@ if __name__ == "__main__":
     is_show_api = args.show_api
 
     logger = get_logger()
-    prepare_project_dir()
+    prepare_project_dir(logger=logger)
 
     logger.info(f"Starting server with config: {args}")
 
@@ -519,10 +557,11 @@ if __name__ == "__main__":
     UPLOADED_FILES = []
     LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
     GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
+    CSV_LIST_COLLECTIONS = os.listdir(CSV_UPLOADED_FOLDER) 
 
     agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
     chat_agent = ChatWrapper(agent_executor)
-    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0])
+    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0], CSV_LIST_COLLECTIONS[0])
     chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
 
 
