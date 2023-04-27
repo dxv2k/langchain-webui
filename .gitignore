@@ -171,3 +171,4 @@ GPTIndexEmbeddings/*
 .space
 .env*
 .jupyter_env
+uploaded_csv/*
