@@ -182,25 +182,13 @@ def change_qa_agent_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Ch
     return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
 
 
-def change_csv_tool_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Chatbot, None, None, gr.Slider]:
+def change_gpt_index_agent_handler(index_name, csv_filepath) -> Union[gr.Chatbot, None, None, gr.Slider]:
     logger.info(f"Change GPTIndex Agent to use collection: {index_name}")
 
     global chat_gpt_index_agent   # NOTE: dirty way to do similar to gr.State()
     chat_gpt_index_agent = None
 
-    agent_executor = load_gpt_index_agent(index_name=index_name)
-    chat_gpt_index_agent = ChatWrapper(agent_executor)
-
-    return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
-
-
-def change_gpt_index_agent_handler(index_name: str, chatbot: gr.Chatbot) -> Union[gr.Chatbot, None, None, gr.Slider]:
-    logger.info(f"Change GPTIndex Agent to use collection: {index_name}")
-
-    global chat_gpt_index_agent   # NOTE: dirty way to do similar to gr.State()
-    chat_gpt_index_agent = None
-
-    agent_executor = load_gpt_index_agent(index_name=index_name)
+    agent_executor = load_gpt_index_agent(index_name=index_name, csv_filepath=csv_filepath)
     chat_gpt_index_agent = ChatWrapper(agent_executor)
 
     return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
@@ -484,13 +472,13 @@ def app() -> gr.Blocks:
         gpt_agent_state = gr.State()
 
         # NOTE: Multi inputs function must remove type annotation 
-        csv_dropdown_btn.change(load_gpt_index_agent, 
+        csv_dropdown_btn.change(change_gpt_index_agent_handler, 
                             inputs=[gpt_index_dropdown_btn,csv_dropdown_btn],
                             outputs=[gpt_index_chatbot, gpt_state, gpt_agent_state, gpt_temperature_llm_slider])
 
 
         gpt_index_dropdown_btn.change(change_gpt_index_agent_handler,
-                                  inputs=[gpt_index_dropdown_btn,csv_dropdown_btn],
+                                  inputs=[gpt_index_dropdown_btn, csv_dropdown_btn],
                                   outputs=[gpt_index_chatbot, gpt_state, gpt_agent_state, gpt_temperature_llm_slider])
 
 
