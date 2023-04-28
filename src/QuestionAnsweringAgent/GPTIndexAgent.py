@@ -168,7 +168,7 @@ def build_chat_agent_executor(
     additional_tools: list[Tool] = None
 ) -> AgentExecutor:
     chat_llm = ChatOpenAI(temperature=0.2, max_tokens=None)
-    memory = ConversationBufferMemory(memory_key="chat_history", output_key='output')
+    memory = ConversationBufferMemory(memory_key="chat_history", output_key='output', return_messages=True)
 
     default_toolkit = create_tool_from_index_name(
         index_name=index_name,
@@ -179,7 +179,7 @@ def build_chat_agent_executor(
     if additional_tools:
         tools.extend(additional_tools)
 
-    agent = ConversationalAgent.from_llm_and_tools(
+    agent = ConversationalChatAgent.from_llm_and_tools(
         llm=chat_llm,
         tools=tools,
         prefix=DEFAULT_PREFIX,
