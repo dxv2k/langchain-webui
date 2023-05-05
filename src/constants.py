@@ -8,6 +8,9 @@ CSV_UPLOADED_FOLDER: str = "./uploaded_csv"
 
 AGENT_VEROBSE: bool = True
 
+CSV2TXT_FOLDER = "./csv2txt"
+
+KNOWLEDGE_GRAPH_FOLDER: str = "./knowledge_graph" 
 
 GPT_INDEX_QUERY_CONFIG = query_configs = [
     {
