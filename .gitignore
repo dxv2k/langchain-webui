@@ -172,3 +172,6 @@ GPTIndexEmbeddings/*
 .env*
 .jupyter_env
 uploaded_csv/*
+csv2txt
+knowledge_graph
+LlamaGraphEmbeddings
