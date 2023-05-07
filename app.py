@@ -1,6 +1,9 @@
 from typing import Union
+from src.AutoCSVPipeline.agent import build_graph_chat_agent_executor
+from src.AutoCSVPipeline.pipeline import pipeline
+from src.AutoCSVPipeline.prompt import SUMMARY_DEVELOPMENT_TEMPLATE_PROMPT
 import src.GPTIndexDocument.index_doc as gpt_index
-from src.constants import CSV_UPLOADED_FOLDER, FAISS_LOCAL_PATH, SAVE_DIR, GPT_INDEX_LOCAL_PATH
+from src.constants import CSV_UPLOADED_FOLDER, FAISS_LOCAL_PATH, KNOWLEDGE_GRAPH_FOLDER, SAVE_DIR, GPT_INDEX_LOCAL_PATH
 from src.QuestionAnsweringAgent.GPTIndexAgent import build_chat_agent_executor, build_gpt_index_chat_agent_executor, create_pandas_dataframe_tool
 from src.QuestionAnsweringAgent.QuestionAnsweringAgent import build_qa_agent_executor
 import src.IndexDocuments.index_doc as langchain_index
@@ -133,6 +136,57 @@ def csv_upload_file_handler(files) -> list[str]:
     # UPLOADED_FILES = uploads_filepath
     return uploads_filepath
 
+def graph_change_temperature_gpt_index_llm_handler(temperature: float) -> gr.Slider: 
+    global chat_graph_agent
+    agent_executor = chat_graph_agent.agent
+    chat_graph_agent.agent.agent.llm_chain.llm.temperature = temperature
+    logger.info(
+        f"Change LLM temperature of Graph Agent to {agent_executor.agent.llm_chain.llm.temperature}")
+
+
+def reset_to_default_prompt_handler() -> gr.Textbox: 
+    global USER_SUMMARY_PROMPT
+    USER_SUMMARY_PROMPT = SUMMARY_DEVELOPMENT_TEMPLATE_PROMPT 
+    return gr.Textbox.update(value=USER_SUMMARY_PROMPT) 
+
+
+def construct_graph_from_csv_handler(
+    index_name, 
+    progress=gr.Progress()
+): 
+    global USER_SUMMARY_PROMPT
+    global AUTO_CSV_UPLOADED_FILES
+    logger.info(
+        f"{AUTO_CSV_UPLOADED_FILES}, {index_name}")
+    graph = pipeline(
+        csv_filepath=AUTO_CSV_UPLOADED_FILES[0], 
+        user_summary_prompt=USER_SUMMARY_PROMPT, 
+        index_name=index_name 
+    ) 
+
+    return "!!! DONE !!!" 
+
+
+def graph_csv_upload_file_handler(files) -> list[str]: 
+    global AUTO_CSV_UPLOADED_FILES  # NOTE: dirty way to do similar to gr.State()
+    AUTO_CSV_UPLOADED_FILES = []
+
+    file_paths = [file.name for file in files]
+
+    # loop over all files in the source directory
+    uploads_filepath = []
+    for path in file_paths:
+        filename = get_filename(path)
+        destination_path = os.path.join(CSV_UPLOADED_FOLDER, filename)
+
+        # copy file from source to destination
+        shutil.copy(path, destination_path)
+        uploads_filepath.append(destination_path)
+
+    AUTO_CSV_UPLOADED_FILES = uploads_filepath
+    print("DEBUG: ",AUTO_CSV_UPLOADED_FILES)
+    return uploads_filepath
+
 
 def upload_file_handler(files) -> list[str]:
     global UPLOADED_FILES  # NOTE: dirty way to do similar to gr.State()
@@ -193,14 +247,29 @@ def change_gpt_index_agent_handler(index_name, csv_filepath) -> Union[gr.Chatbot
 
     return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
 
+def change_graph_agent_handler(graph_name) -> Union[gr.Chatbot, None, None, gr.Slider]: 
+    logger.info(f"Change Llmama-Index Graph Agent to use collection: {graph_name}")
+
+    global chat_graph_agent   # NOTE: dirty way to do similar to gr.State()
+    chat_graph_agent = None
+
+    agent_executor = build_graph_chat_agent_executor(graph_name=graph_name)
+    chat_graph_agent = ChatWrapper(agent_executor)
+
+    return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
+
 
 def refresh_collection_list_handler() -> gr.Dropdown:
     global LIST_COLLECTIONS  # NOTE: dirty way to do similar to gr.State()
     LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
     return gr.Dropdown.update(choices=LIST_COLLECTIONS)
 
+def graph_refresh_collection_list_handler() -> gr.Dropdown:
+    global KNOWLEDGE_GRAPH_COLLECTIONS  # NOTE: dirty way to do similar to gr.State()
+    KNOWLEDGE_GRAPH_COLLECTIONS = os.listdir(KNOWLEDGE_GRAPH_FOLDER)
+    return gr.Dropdown.update(choices=KNOWLEDGE_GRAPH_COLLECTIONS)
 
-# TODO: modified it to have csv 
+
 def gpt_index_refresh_collection_list_handler() -> Union[gr.Dropdown, gr.Dropdown]:
     global GPT_INDEX_LIST_COLLECTIONS  # NOTE: dirty way to do similar to gr.State()
     global CSV_LIST_COLLECTIONS # NOTE: dirty way to do similar to gr.State()
@@ -210,6 +279,12 @@ def gpt_index_refresh_collection_list_handler() -> Union[gr.Dropdown, gr.Dropdow
 
     return gr.Dropdown.update(choices=GPT_INDEX_LIST_COLLECTIONS), gr.Dropdown.update(choices=CSV_LIST_COLLECTIONS)
 
+
+def graph_clear_chat_history_handler() -> Union[gr.Chatbot, None, None]:
+    global chat_graph_agent  # NOTE: dirty way to do similar to gr.State()
+    chat_graph_agent.clear_agent_memory()
+    logger.info(f"Clear graph agent memory...")
+    return gr.Chatbot.update(value=[]), None, None
 
 def clear_chat_history_handler() -> Union[gr.Chatbot, None, None]:
     global chat_agent  # NOTE: dirty way to do similar to gr.State()
@@ -241,6 +316,15 @@ def change_temperature_gpt_index_llm_handler(temperature: float) -> gr.Slider:
         f"Change LLM temperature to {agent_executor.agent.llm_chain.llm.temperature}")
 
 
+def change_temperature_auto_csv_handler(temperature: float) -> gr.Slider: 
+    global chat_graph_agent
+    agent_executor = chat_graph_agent.agent
+    chat_graph_agent.agent.agent.llm_chain.llm.temperature = temperature
+    logger.info(
+        f"Change LLM temperature to {agent_executor.agent.llm_chain.llm.temperature}")
+    return gr.Slider.update(value=temperature)
+    
+
 def chat_gpt_index_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.State]:
     global chat_gpt_index_agent
     chatbot, state = chat_gpt_index_agent(message_txt_box, state, agent_state)
@@ -253,12 +337,112 @@ def chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.St
     return chatbot, state
 
 
+def graph_chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.State]:
+    global chat_graph_agent
+    chatbot, state = chat_graph_agent(message_txt_box, state, agent_state)
+    return chatbot, state
+
+
 # -------------------------------------------------------------------------------
 
 def app() -> gr.Blocks:
     block = gr.Blocks(css=".gradio-container {background-color: lightgray}")
 
     with block:
+        with gr.Tab("Chat with Knowledge Graph"):
+            with gr.Row():
+                graph_index_dropdown_btn = gr.Dropdown(
+                    value=KNOWLEDGE_GRAPH_COLLECTIONS[0] if KNOWLEDGE_GRAPH_COLLECTIONS else None, 
+                    label="Index/Collection to chat with",
+                    choices=KNOWLEDGE_GRAPH_COLLECTIONS)
+
+                graph_refresh_btn = gr.Button("⟳ Refresh Collections").style(full_width=False)
+
+            graph_temperature_llm_slider = gr.Slider(0, 2, step=0.1, value=0.1, label="Temperature")
+            graph_temperature_llm_slider.change(
+                graph_change_temperature_gpt_index_llm_handler,
+                inputs=graph_temperature_llm_slider 
+            )
+
+            graph_chatbot = gr.Chatbot()
+
+            with gr.Row():
+                    graph_message_txt_box = gr.Textbox(
+                        label="What's your question?",
+                        placeholder="What's the answer to life, the universe, and everything?",
+                        lines=1,
+                    ).style(full_width=True)
+
+                    graph_submit_chat_msg_btn = gr.Button(
+                        value="Send", variant="primary").style(full_width=False)
+
+                    graph_clear_chat_history_btn = gr.Button(
+                        value="Clear chat history (will clear chatbot memory)",
+                        variant="stop").style(full_width=False)
+
+            gr.Examples(
+                examples=[
+                    "Hi! How's it going?",
+                    "What should I do tonight?",
+                    "Whats 2 + 2?",
+                ],
+                inputs=graph_message_txt_box,
+            )
+
+            gr.HTML("Demo application of a LangChain chain.")
+            gr.HTML(
+                "<center>Powered by <a href='https://github.com/hwchase17/langchain'>LangChain 🦜️🔗</a></center>"
+            )
+
+        with gr.Tab("Construct Knowledge Graph from CSV"):
+            gr.Markdown("<h3><center>Construct Knowledge Graph from CSV</center></h3>")
+            
+            graph_index_name = gr.Textbox(
+                label="Collection/Index Name",
+                placeholder="What's the name for this index? Eg: Epsom_Reviews_2019",
+                lines=1) 
+
+            graph_index_btn = gr.Button(
+                value="Index!", variant="primary").style(full_width=False)
+
+            graph_summary_prompt_txt_box = gr.Textbox(
+                label="Summary prompt for each development",
+                value=USER_SUMMARY_PROMPT,
+                lines=8,
+            ).style(full_width=True, full_height=True) 
+
+            with gr.Row(): 
+                # csv_temperature_llm_slider = gr.Slider(0, 2, step=0.2, value=0.1, label="LLM Temperature")
+                # csv_temperature_llm_slider.change(
+                #     change_temperature_gpt_index_llm_handler,
+                #     inputs=csv_temperature_llm_slider 
+                # )
+
+                # update_prompt_btn = gr.Button(value="Update Prompt") 
+                # update_prompt_btn.click(update_prompt_handler, 
+                #                     inputs=csv_summary_prompt_txt_box)
+
+                default_prompt_btn = gr.Button(value="Reset to default Prompt")
+                default_prompt_btn.click(reset_to_default_prompt_handler, 
+                    outputs=graph_summary_prompt_txt_box
+                )
+
+
+            graph_file_output = gr.File()
+            graph_upload_button = gr.UploadButton(
+                "Click to upload *.csv files",
+                file_types=[".csv"],
+                file_count="multiple"
+            )
+            graph_upload_button.upload(graph_csv_upload_file_handler, graph_upload_button,
+                                graph_file_output, api_name="upload_csv_files")
+
+            graph_index_btn.click(construct_graph_from_csv_handler, 
+                                inputs=graph_index_name, 
+                                outputs=graph_index_name
+            )
+
+
         with gr.Tab("Chat GPT_Index"):
             with gr.Row():
                 gr.Markdown("<h3><center>GPTIndex + LangChain Demo</center></h3>")
@@ -442,6 +626,34 @@ def app() -> gr.Blocks:
                                         overlap_chunk_slider, index_name],
                                 outputs=status_text)
 
+        # NOTE: llama-index Graph Chat Agent
+        graph_state = gr.State()
+        graph_agent_state = gr.State()
+
+        graph_index_dropdown_btn.change(change_graph_agent_handler,
+                                  inputs=graph_index_dropdown_btn,
+                                  outputs=[graph_chatbot, graph_state, graph_agent_state, graph_temperature_llm_slider])
+
+        graph_clear_chat_history_btn.click(
+            graph_clear_chat_history_handler,
+            outputs=[graph_chatbot, graph_state, graph_agent_state]
+        )
+
+        graph_refresh_btn.click(fn=graph_refresh_collection_list_handler,
+                          outputs=graph_index_dropdown_btn)
+
+        # NOTE: to avoid Gradio holding object, you should wrap everything within a function
+        graph_submit_chat_msg_btn.click(fn=graph_chat_handler,
+                                  inputs=[graph_message_txt_box, graph_state, graph_agent_state],
+                                  outputs=[graph_chatbot, graph_state])
+
+        # NOTE: to avoid Gradio holding object, you should wrap everything within a function
+        graph_message_txt_box.submit(fn=graph_chat_handler,
+                               inputs=[graph_message_txt_box, graph_state, graph_agent_state],
+                               outputs=[graph_chatbot, graph_state],
+                               api_name="chats")
+ 
+        # LangChain Chat Agent
         state = gr.State()
         agent_state = gr.State()
 
@@ -457,7 +669,7 @@ def app() -> gr.Blocks:
         refresh_btn.click(fn=refresh_collection_list_handler,
                           outputs=index_dropdown_btn)
 
-        # TODO: to avoid Gradio holding object, you should wrap everything within a function
+        # NOTE: to avoid Gradio holding object, you should wrap everything within a function
         submit_chat_msg_btn.click(fn=chat_handler,
                                   inputs=[message_txt_box, state, agent_state],
                                   outputs=[chatbot, state])
@@ -546,16 +758,25 @@ if __name__ == "__main__":
 
     # Declared global variable scope
     UPLOADED_FILES = []
-    LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
-    GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
-    CSV_LIST_COLLECTIONS = os.listdir(CSV_UPLOADED_FOLDER) 
 
+
+    LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
     agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
     chat_agent = ChatWrapper(agent_executor)
-    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0], CSV_LIST_COLLECTIONS[0])
+
+    GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
+    CSV_LIST_COLLECTIONS = os.listdir(CSV_UPLOADED_FOLDER) 
+    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0], 
+                                                    CSV_LIST_COLLECTIONS[0])
     chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
 
-
+    AUTO_CSV_UPLOADED_FILES = []
+    KNOWLEDGE_GRAPH_COLLECTIONS = os.listdir(KNOWLEDGE_GRAPH_FOLDER)
+    USER_SUMMARY_PROMPT = SUMMARY_DEVELOPMENT_TEMPLATE_PROMPT 
+    chat_graph_agent = None
+    if KNOWLEDGE_GRAPH_COLLECTIONS: 
+        graph_executor = build_graph_chat_agent_executor(KNOWLEDGE_GRAPH_COLLECTIONS[0])  
+        chat_graph_agent = ChatWrapper(graph_executor) 
 
     block = app()
     block.queue(concurrency_count=n_concurrency).launch(
@@ -565,5 +786,6 @@ if __name__ == "__main__":
         show_api=is_show_api
     )
 
+# NOTE: for development
 # block = app()
 # block.queue(concurrency_count=10).launch(debug=True, server_port=8000)

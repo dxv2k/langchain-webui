@@ -2,8 +2,9 @@ import os
 import pandas as pd 
 from tqdm import tqdm
 from llama_index import SimpleDirectoryReader, GPTTreeIndex, GPTVectorStoreIndex, ComposableGraph, GPTListIndex
-from src.constants import CSV2TXT_FOLDER, GPT_INDEX_LOCAL_PATH, KNOWLEDGE_GRAPH_FOLDER, GPT_INDEX_LOCAL_PATH 
-from src.AutoCSVPipeline.prompt import get_summary_prompt 
+from src.constants import CSV2TXT_FOLDER, GPT_INDEX_LOCAL_PATH, GRAPH_EMBEDDINGS_LOCAL_PATH, KNOWLEDGE_GRAPH_FOLDER, GPT_INDEX_LOCAL_PATH 
+from src.AutoCSVPipeline.prompt import get_summary_prompt
+from src.utils.logger import get_logger 
 
 
 def groupby_development(df: pd.DataFrame) -> dict[str | int,pd.DataFrame]: 
@@ -26,7 +27,7 @@ def df_row_to_context_file(
         Convert Dataframe Row to text and save to file by {development_id}_{reviewer_id}.txt 
         param: 
             df_of_development: 
-            to_save_dir 
+            to_save_dir:  
         return: 
     """
     dict_context_by_development: dict[str,list[str]] = {}
@@ -36,7 +37,7 @@ def df_row_to_context_file(
             reviewer_id = row['id']
             review_date = row['review_date']
             development = row['development']
-            development_id = row['development_id']
+            development_id = int(row['development_id']) 
             rating = row['rating']
             rating_facilities = row['rating_facilities']
             rating_design = row['rating_design']
@@ -90,8 +91,24 @@ The best feature of the development: {best_feature}
 
 def get_embeddings_from_folder(
         folderpath: str, 
+        stored_index_folder: str, 
         custom_summary_prompt: str = None
 ) -> tuple[list[GPTVectorStoreIndex], list[str]]: 
+    '''
+    param: 
+        folderpath: str, *.txt folders  
+        stored_index_folder: str
+        custom_summary_prompt: this prompt will be used for each folder to run summarization 
+    return:  
+        all_indices: list[GPTVectorStoreIndex]
+        index_summaries: list[str]
+    '''
+    logger = get_logger()
+    logger.info(f"get_embeddings_from_folder of {folderpath}")
+    _stored_index_folder = f"{GRAPH_EMBEDDINGS_LOCAL_PATH}/{stored_index_folder}"
+    if not os.path.exists(_stored_index_folder): 
+        os.makedirs(_stored_index_folder)
+
     list_developments = os.listdir(folderpath)
 
     all_indices: list[GPTVectorStoreIndex] = []
@@ -109,7 +126,7 @@ def get_embeddings_from_folder(
 
         all_indices.append(index)
         index_summaries.append(summary)
-        index.save_to_disk(f"./{GPT_INDEX_LOCAL_PATH}/{development_id}.json")
+        index.save_to_disk(f"{GRAPH_EMBEDDINGS_LOCAL_PATH}/{stored_index_folder}/{development_id}.json")
 
     return all_indices, index_summaries
 

@@ -18,7 +18,9 @@ def pipeline(
     filename = os.path.splitext(filename)[0] # NOTE: remove file extension
 
     # create stored txt folder 
-    stored_txt_folder = f"{CSV2TXT_FOLDER}/{filename}" 
+    stored_txt_folder = f"{CSV2TXT_FOLDER}/{index_name}" if index_name else f"{CSV2TXT_FOLDER}/{filename}"  
+    graph_name = index_name if index_name else filename
+    stored_index_folder = index_name if index_name else filename 
     if not os.path.exists(stored_txt_folder): 
         os.makedirs(stored_txt_folder) 
 
@@ -33,13 +35,11 @@ def pipeline(
 
     # Indexing by folder & Summarize 
     all_indices, index_summaries = get_embeddings_from_folder(stored_txt_folder,
+                                    stored_index_folder=stored_index_folder, 
                                     custom_summary_prompt=user_summary_prompt)  
 
-    # Construct Graph 
+    # Construct & Save Graph 
     graph = build_graph_from_indices(all_indices,index_summaries)
-
-    # Save Graph 
-    graph_name = index_name if index_name else filename
     save_graph(graph, graph_name)
 
     return graph 

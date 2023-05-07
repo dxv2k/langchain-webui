@@ -2,6 +2,8 @@ FAISS_LOCAL_PATH: str = "./faiss"
 
 GPT_INDEX_LOCAL_PATH: str = "./GPTIndexEmbeddings"
 
+GRAPH_EMBEDDINGS_LOCAL_PATH: str = "./LlamaGraphEmbeddings"
+
 SAVE_DIR: str = "./uploads/"
 
 CSV_UPLOADED_FOLDER: str = "./uploaded_csv"
@@ -12,21 +14,21 @@ CSV2TXT_FOLDER = "./csv2txt"
 
 KNOWLEDGE_GRAPH_FOLDER: str = "./knowledge_graph" 
 
-GPT_INDEX_QUERY_CONFIG = query_configs = [
+GRAPH_QUERY_CONFIG = [
     {
         "index_struct_type": "simple_dict",
         "query_mode": "default",
         "query_kwargs": {
-            "similarity_top_k": 5,
-            # "include_summary": True
-        },
-    },
-    {
-        "index_struct_type": "list",
-        "query_mode": "default",
-        "query_kwargs": {
-            "response_mode": "tree_summarize",
-            "verbose": True
+            "similarity_top_k": 10,
+            "response_mode": "tree_summarize"
         }
     },
-]
+    {
+        "index_struct_type": "simple_dict",
+        "query_mode": "default",
+        "query_kwargs": {
+            "similarity_top_k": 10,
+            "response_mode": "tree_summarize"
+        }
+    },
+] 

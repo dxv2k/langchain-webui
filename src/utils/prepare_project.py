@@ -1,5 +1,5 @@
 import os 
-from src.constants import CSV_UPLOADED_FOLDER, FAISS_LOCAL_PATH, KNOWLEDGE_GRAPH_FOLDER, SAVE_DIR, GPT_INDEX_LOCAL_PATH, CSV2TXT_FOLDER
+from src.constants import CSV_UPLOADED_FOLDER, FAISS_LOCAL_PATH, GRAPH_EMBEDDINGS_LOCAL_PATH, KNOWLEDGE_GRAPH_FOLDER, SAVE_DIR, GPT_INDEX_LOCAL_PATH, CSV2TXT_FOLDER
 
 
 def prepare_project_dir(logger: any) -> None:
@@ -26,4 +26,8 @@ def prepare_project_dir(logger: any) -> None:
     if not os.path.exists(KNOWLEDGE_GRAPH_FOLDER):
         logger.info(f"created {KNOWLEDGE_GRAPH_FOLDER}")
         os.mkdir(KNOWLEDGE_GRAPH_FOLDER)
+
+    if not os.path.exists(GRAPH_EMBEDDINGS_LOCAL_PATH):
+        logger.info(f"created {GRAPH_EMBEDDINGS_LOCAL_PATH}")
+        os.mkdir(GRAPH_EMBEDDINGS_LOCAL_PATH)
 
