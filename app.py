@@ -1,5 +1,5 @@
 from typing import Union
-from src.AutoCSVPipeline.agent import build_graph_chat_agent_executor
+from src.AutoCSVPipeline.agent import build_custom_graph_chat_agent_executor, build_default_graph_chat_agent_executor
 from src.AutoCSVPipeline.pipeline import pipeline
 from src.AutoCSVPipeline.prompt import SUMMARY_DEVELOPMENT_TEMPLATE_PROMPT
 import src.GPTIndexDocument.index_doc as gpt_index
@@ -253,7 +253,8 @@ def change_graph_agent_handler(graph_name) -> Union[gr.Chatbot, None, None, gr.S
     global chat_graph_agent   # NOTE: dirty way to do similar to gr.State()
     chat_graph_agent = None
 
-    agent_executor = build_graph_chat_agent_executor(graph_name=graph_name)
+    # agent_executor = build_default_graph_chat_agent_executor(graph_name=graph_name)
+    agent_executor = build_custom_graph_chat_agent_executor(graph_name=graph_name)
     chat_graph_agent = ChatWrapper(agent_executor)
 
     return gr.Chatbot.update(value=[]), None, None, gr.Slider.update(value=agent_executor.agent.llm_chain.llm.temperature)
@@ -775,7 +776,8 @@ if __name__ == "__main__":
     USER_SUMMARY_PROMPT = SUMMARY_DEVELOPMENT_TEMPLATE_PROMPT 
     chat_graph_agent = None
     if KNOWLEDGE_GRAPH_COLLECTIONS: 
-        graph_executor = build_graph_chat_agent_executor(KNOWLEDGE_GRAPH_COLLECTIONS[0])  
+        # graph_executor = build_default_graph_chat_agent_executor(KNOWLEDGE_GRAPH_COLLECTIONS[0])  
+        graph_executor = build_custom_graph_chat_agent_executor(KNOWLEDGE_GRAPH_COLLECTIONS[0])  
         chat_graph_agent = ChatWrapper(graph_executor) 
 
     block = app()
