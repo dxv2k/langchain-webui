@@ -88,9 +88,8 @@ def build_custom_graph_chat_agent_executor(
     agent = ConversationalChatAgent.from_llm_and_tools(
         llm=chat_llm,
         tools=tools,
-        prefix=DEFAULT_PREFIX,
-        format_instructions=DEFAULT_FORMAT_INSTRUCTIONS, 
-        suffix=DEFAULT_SUFFIX
+        system_message=DEFAULT_PREFIX,
+        # suffix=DEFAULT_SUFFIX
     )
 
     agent_executor = AgentExecutor.from_agent_and_tools(

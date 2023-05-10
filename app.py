@@ -760,7 +760,6 @@ if __name__ == "__main__":
     # Declared global variable scope
     UPLOADED_FILES = []
 
-
     LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
     agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
     chat_agent = ChatWrapper(agent_executor)
