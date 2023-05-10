@@ -152,15 +152,16 @@ def reset_to_default_prompt_handler() -> gr.Textbox:
 
 def construct_graph_from_csv_handler(
     index_name, 
+    summary_prompt, 
     progress=gr.Progress()
 ): 
-    global USER_SUMMARY_PROMPT
+    # global USER_SUMMARY_PROMPT
     global AUTO_CSV_UPLOADED_FILES
     logger.info(
         f"{AUTO_CSV_UPLOADED_FILES}, {index_name}")
     graph = pipeline(
         csv_filepath=AUTO_CSV_UPLOADED_FILES[0], 
-        user_summary_prompt=USER_SUMMARY_PROMPT, 
+        user_summary_prompt=summary_prompt, 
         index_name=index_name 
     ) 
 
@@ -439,7 +440,7 @@ def app() -> gr.Blocks:
                                 graph_file_output, api_name="upload_csv_files")
 
             graph_index_btn.click(construct_graph_from_csv_handler, 
-                                inputs=graph_index_name, 
+                                inputs=[graph_index_name,graph_summary_prompt_txt_box], 
                                 outputs=graph_index_name
             )
 
