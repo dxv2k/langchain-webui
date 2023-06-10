@@ -175,3 +175,8 @@ uploaded_csv/*
 csv2txt
 knowledge_graph
 LlamaGraphEmbeddings
+*.ipynb_checkpoints
+*.ipynb
+*.csv
+*.rar 
+*.zip 

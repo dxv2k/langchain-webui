@@ -329,18 +329,27 @@ def change_temperature_auto_csv_handler(temperature: float) -> gr.Slider:
 
 def chat_gpt_index_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.State]:
     global chat_gpt_index_agent
+    if not chat_gpt_index_agent: 
+        return [("There is no available document to chat with, you must indexing one before chatting","")], state 
+
     chatbot, state = chat_gpt_index_agent(message_txt_box, state, agent_state)
     return chatbot, state
 
 
 def chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.State]:
     global chat_agent
+    if not chat_agent: 
+        return [("There is no available document to chat with, you must indexing one before chatting","")], state 
+
     chatbot, state = chat_agent(message_txt_box, state, agent_state)
     return chatbot, state
 
 
 def graph_chat_handler(message_txt_box, state, agent_state) -> Union[gr.Chatbot, gr.State]:
     global chat_graph_agent
+    if not chat_graph_agent: 
+        return [("There is no available document to chat with, you must indexing one before chatting","")], state 
+
     chatbot, state = chat_graph_agent(message_txt_box, state, agent_state)
     return chatbot, state
 
@@ -763,14 +772,19 @@ if __name__ == "__main__":
 
 
     LIST_COLLECTIONS = os.listdir(FAISS_LOCAL_PATH)
-    agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
-    chat_agent = ChatWrapper(agent_executor)
+    chat_agent = None
+    if LIST_COLLECTIONS: 
+        agent_executor = load_qa_agent(LIST_COLLECTIONS[0])
+        chat_agent = ChatWrapper(agent_executor)
 
     GPT_INDEX_LIST_COLLECTIONS = os.listdir(GPT_INDEX_LOCAL_PATH)
     CSV_LIST_COLLECTIONS = os.listdir(CSV_UPLOADED_FOLDER) 
-    gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0], 
+    gpt_index_agent_executor = None 
+    chat_gpt_index_agent = None
+    if GPT_INDEX_LIST_COLLECTIONS and CSV_LIST_COLLECTIONS:  
+        gpt_index_agent_executor = load_gpt_index_agent(GPT_INDEX_LIST_COLLECTIONS[0], 
                                                     CSV_LIST_COLLECTIONS[0])
-    chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
+        chat_gpt_index_agent = ChatWrapper(gpt_index_agent_executor)
 
     AUTO_CSV_UPLOADED_FILES = []
     KNOWLEDGE_GRAPH_COLLECTIONS = os.listdir(KNOWLEDGE_GRAPH_FOLDER)
